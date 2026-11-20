@@ -1,20 +1,21 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Activity, ArrowUpRight, BadgeCheck, Clipboard, Fingerprint, Plus, ShieldCheck, Sparkles, X } from "lucide-react";
+import { Activity, ArrowUpRight, BadgeCheck, Clipboard, Fingerprint, Plus, ShieldCheck, X } from "lucide-react";
 
 type ProofTask = { id: string; title: string; owner: string; detail: string; status: "Pending" | "Verified"; createdAt: string; hash?: string };
 const STORAGE_KEY = "veritraceai.tasks.v1";
 
 export default function Home() {
   const [tasks, setTasks] = useState<ProofTask[]>([]);
+  const [hydrated, setHydrated] = useState(false);
   const [title, setTitle] = useState("");
   const [owner, setOwner] = useState("My workspace");
   const [detail, setDetail] = useState("");
   const [selected, setSelected] = useState<ProofTask | null>(null);
   const [toast, setToast] = useState("");
-  useEffect(() => { try { const saved = localStorage.getItem(STORAGE_KEY); if (saved) setTasks(JSON.parse(saved)); } catch { /* ignore invalid local data */ } }, []);
-  useEffect(() => { if (tasks.length || localStorage.getItem(STORAGE_KEY)) localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks)); }, [tasks]);
+  useEffect(() => { try { const saved = localStorage.getItem(STORAGE_KEY); if (saved) setTasks(JSON.parse(saved)); } catch { /* ignore invalid local data */ } finally { setHydrated(true); } }, []);
+  useEffect(() => { if (hydrated) localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks)); }, [tasks, hydrated]);
   const verified = useMemo(() => tasks.filter(t => t.status === "Verified").length, [tasks]);
   const pending = tasks.length - verified;
   function notify(message: string) { setToast(message); window.setTimeout(() => setToast(""), 2600); }
