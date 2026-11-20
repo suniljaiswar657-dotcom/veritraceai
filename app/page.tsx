@@ -74,23 +74,26 @@ export default function Home() {
       const {data,error}=await supabase.from("work_records").insert({user_id:user.id,title:task.title,owner_label:task.owner,description:task.detail}).select().single();
       if(error){notify("Save failed: "+error.message);return;}
       task.id=data.id;task.createdAt=data.created_at;
-      await supabase.from("audit_events").insert({record_id:task.id,user_id:user.id,event_type:"record_created",payload:{title:task.title}});
     }
     setTasks(prev=>[task,...prev]);setTitle("");setDetail("");notify(user?"Saved securely to cloud":"Saved in this browser");
   }
 
   async function verifyTask(task:ProofTask) {
-    const payload=JSON.stringify({id:task.id,title:task.title,owner:task.owner,detail:task.detail,createdAt:task.createdAt});
-    const digest=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(payload));
-    const hash=Array.from(new Uint8Array(digest)).map(b=>b.toString(16).padStart(2,"0")).join("");
-    const updated={...task,status:"Verified" as const,hash};
+    let hash = "";
+    const updatedAt = new Date().toISOString();
     if(user && supabase) {
-      const {error}=await supabase.from("work_records").update({status:"Verified",sha256_hash:hash,verified_at:new Date().toISOString()}).eq("id",task.id);
+      const {data,error}=await supabase.from("work_records").update({status:"Verified"}).eq("id",task.id).select("sha256_hash,verified_at").single();
       if(error){notify("Proof save failed: "+error.message);return;}
-      const {error:auditError}=await supabase.from("audit_events").insert({record_id:task.id,user_id:user.id,event_type:"proof_generated",payload:{sha256:hash}});
-      if(auditError){notify("Proof saved; audit event warning: "+auditError.message);}
+      hash=data.sha256_hash;
+    } else {
+      const payload=JSON.stringify({id:task.id,title:task.title,owner:task.owner,detail:task.detail,createdAt:task.createdAt});
+      const digest=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(payload));
+      hash=Array.from(new Uint8Array(digest)).map(b=>b.toString(16).padStart(2,"0")).join("");
     }
-    setTasks(prev=>prev.map(t=>t.id===task.id?updated:t));setSelected(updated);notify(user?"Cloud proof generated":"Fingerprint generated locally");
+    const updated={...task,status:"Verified" as const,hash};
+    setTasks(prev=>prev.map(t=>t.id===task.id?updated:t));
+    setSelected(updated);
+    notify(user?"Server-generated cloud proof saved":"Fingerprint generated locally");
   }
 
   function exportProof(task:ProofTask) {
